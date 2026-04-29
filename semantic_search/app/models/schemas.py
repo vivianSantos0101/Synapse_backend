@@ -1,9 +1,9 @@
 from pydantic import BaseModel, Field
 
 class IndexReadmeRequest(BaseModel):
-    repo_name: str = Field(..., description="Ex: 'empresa/meu-projeto'")
-    content: str = Field(..., description="Conteúdo completo do README.md")
-    metadata: dict = Field(default_factory=dict, description="Metadados extras (team, language...)")
+    repo_name: str = Field(...)
+    content: str = Field(...)
+    metadata: dict = Field(default_factory=dict)
 
 class IndexReadmeResponse(BaseModel):
     repo_name: str
@@ -13,14 +13,13 @@ class IndexReadmeResponse(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=2)
     top_k: int = Field(default=5, ge=1, le=20)
-    min_score: float = Field(default=0.30, ge=0.0, le=1.0)
+    min_score: float = Field(default=0.30)
 
 class SearchResult(BaseModel):
     repo_name: str
-    section: str = "(sem seção)"
     score: float
     excerpt: str
-    metadata: dict
+    metadata: dict = Field(default_factory=dict)
 
 class SearchResponse(BaseModel):
     query: str
