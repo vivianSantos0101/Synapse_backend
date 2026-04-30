@@ -13,13 +13,21 @@ class VectorStoreService:
             metadata={"hnsw:space": "cosine"}
         )
 
-    def upsert_chunks(self, chunks: list[dict], embeddings: list[list[float]]):
+    def upsert_chunks(self, chunks: list[dict], embeddings: list[list[float]], extra_metadata: dict = None):
         if not chunks:
             return 0
             
+        if extra_metadata is None:
+            extra_metadata = {}
+            
         ids = [str(uuid.uuid4()) for _ in chunks]
         
-        metadatas = [{"repo_name": c["repo_name"]} for c in chunks]
+        # Junta o repo_name com qualquer outro metadado extra que vier da rota
+        metadatas = []
+        for c in chunks:
+            meta = {"repo_name": c["repo_name"]}
+            meta.update(extra_metadata)
+            metadatas.append(meta)
         
         self._collection.upsert(
             ids=ids,
