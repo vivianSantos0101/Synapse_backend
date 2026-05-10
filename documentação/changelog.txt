@@ -1,0 +1,153 @@
+================================================================================
+ SYNAPSE SEMANTIC SEARCH — DOCUMENTAÇÃO DE ALTERAÇÕES
+ Data: 09/05/2026
+================================================================================
+
+1. OBJETIVO DO PROJETO
+----------------------
+Sistema RAG (Retrieval-Augmented Generation) para indexar READMEs de projetos
+da empresa e permitir busca semântica para verificar se determinada ferramenta
+ou funcionalidade já existe em algum repositório no GitLab.
+
+
+2. O QUE FOI FEITO
+-------------------
+
+2.1 Migração ChromaDB → PostgreSQL + pgvector
+    - Removido ChromaDB como banco vetorial
+    - Adicionado PostgreSQL 16 com extensão pgvector
+    - O banco roda via Docker (docker-compose.yml)
+    - Índice HNSW com operação de distância cosseno para busca rápida
+    - Tabela "chunks" armazena: id, repo_name, content, metadata, embedding
+
+2.2 Docker
+    - Criado docker-compose.yml com imagem pgvector/pgvector:pg16
+    - Container nomeado "synapse_pgvector"
+    - Volume persistente "pgdata" para não perder dados ao reiniciar
+    - Healthcheck configurado com pg_isready
+
+2.3 CLI (cli.py)
+    - Criada interface de linha de comando usando argparse + rich
+    - 3 comandos: index, search, stats
+    - Atalho: se o primeiro argumento não for um comando, assume "search"
+    - Aceita busca direta: python cli.py "minha consulta"
+    - Saída formatada com tabelas coloridas (rich)
+
+2.4 20 READMEs Fictícios
+    - Criados 20 arquivos .md na pasta readmes/ para teste
+    - Todos em português, simulando projetos reais de uma empresa
+    - Domínios: autenticação, pagamentos, chatbot, CI/CD, estoque, etc.
+
+2.5 API FastAPI (mantida)
+    - API REST continua funcional em /api/v1
+    - Endpoints: POST /index, DELETE /index/{repo}, POST /search, GET /stats
+    - testar_readme.py testa via HTTP (precisa do servidor rodando)
+
+
+3. ARQUIVOS CRIADOS / MODIFICADOS
+----------------------------------
+
+CRIADOS:
+    docker-compose.yml          — Container PostgreSQL + pgvector
+    cli.py                      — Interface de linha de comando
+    app/core/init_db.py         — Inicialização do banco (extensão + tabela)
+    .env.example                — Template de variáveis de ambiente
+    .gitignore                  — Arquivos ignorados pelo Git
+    readmes/*.md                — 20 READMEs fictícios para teste
+
+MODIFICADOS:
+    app/core/settings.py        — Removido ChromaDB, adicionado DATABASE_URL
+    app/services/vector_store.py — Reescrito: ChromaDB → pgvector (psycopg3)
+    app/services/embedding_service.py — Mantido, apenas limpeza de código
+    app/services/chunker.py     — Mantido sem alterações funcionais
+    app/models/schemas.py       — collection_name → table_name
+    app/api/routes.py           — Import atualizado, wildcard removido
+    app/main.py                 — Adicionado init_db() no lifespan
+    requirements.txt            — Removido chromadb, adicionado psycopg/pgvector/rich
+    .env                        — Credenciais locais do PostgreSQL
+
+REMOVIDOS:
+    data/chroma_db/             — Dados antigos do ChromaDB (SQLite)
+
+
+4. DEPENDÊNCIAS ADICIONADAS
+----------------------------
+    psycopg[binary]>=3.1        — Driver PostgreSQL (psycopg3)
+    pgvector>=0.3.6             — Registro do tipo vector no psycopg
+    rich>=13.7                  — Formatação de tabelas no terminal
+
+DEPENDÊNCIAS REMOVIDAS:
+    chromadb                    — Banco vetorial anterior
+
+
+5. ESTRUTURA DE PASTAS ATUAL
+-----------------------------
+    semantic_search/
+    ├── app/
+    │   ├── api/
+    │   │   └── routes.py
+    │   ├── core/
+    │   │   ├── init_db.py
+    │   │   └── settings.py
+    │   ├── models/
+    │   │   └── schemas.py
+    │   ├── services/
+    │   │   ├── chunker.py
+    │   │   ├── embedding_service.py
+    │   │   └── vector_store.py
+    │   └── main.py
+    ├── readmes/
+    │   ├── api-gateway.md
+    │   ├── auth-gateway.md
+    │   ├── chatbot-core.md
+    │   ├── ci-cd-templates.md
+    │   ├── config-server.md
+    │   ├── dashboard-admin.md
+    │   ├── data-pipeline.md
+    │   ├── doc-generator.md
+    │   ├── feature-flags.md
+    │   ├── file-storage.md
+    │   ├── geo-service.md
+    │   ├── inventory-api.md
+    │   ├── log-aggregator.md
+    │   ├── mobile-app.md
+    │   ├── notification-hub.md
+    │   ├── payment-service.md
+    │   ├── pdf-generator.md
+    │   ├── queue-worker.md
+    │   ├── sso-portal.md
+    │   └── user-analytics.md
+    ├── documentação/
+    │   └── Synapse_Apresentacao.pptx
+    ├── cli.py
+    ├── testar_readme.py
+    ├── docker-compose.yml
+    ├── requirements.txt
+    ├── .env
+    ├── .env.example
+    └── .gitignore
+
+
+6. MODELO DE EMBEDDING UTILIZADO
+---------------------------------
+    sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    - Dimensão: 384
+    - Suporte a múltiplos idiomas (inclusive português)
+    - Leve e rápido para uso local
+
+
+7. RESULTADOS DE TESTE (BUSCA SEMÂNTICA)
+------------------------------------------
+    Consulta                                          | Top Match          | Score
+    -------------------------------------------------|--------------------|------
+    "autenticacao OAuth JWT login"                    | auth-gateway       | 0.65
+    "gerar documento PDF relatorio"                   | pdf-generator      | 0.75
+    "fila de mensagens processamento assincrono"      | queue-worker       | 0.63
+    "envio de email SMS notificacao"                  | notification-hub   | 0.67
+    "controle de estoque produtos armazem"            | inventory-api      | 0.70
+    "deploy automatico CI CD pipeline kubernetes"     | ci-cd-templates    | 0.57
+    "pagamento via PIX e cartao de credito"           | payment-service    | 0.77
+    "chatbot integracao WhatsApp e Telegram"          | chatbot-core       | 0.66
+    "cache distribuido"                               | nebulacache        | 0.55
+
+================================================================================
